@@ -1,20 +1,26 @@
 # Agent Identity Cycle
 
-Current version: `0.1.0`
+Current version: `0.2.0`
 
-A versioned Agent Skill and design reference for a persistent assistant that evolves from concrete practice into memory, identity, factual knowledge, and procedural knowledge.
+A versioned Agent Skill and design reference for a persistent assistant that evolves from concrete practice into recent continuity, episodic evidence, personalized memory, identity, factual knowledge, and procedural knowledge.
 
-The repository follows the community Agent Skills convention under `.agents/skills/`: `SKILL.md` is the runtime entry point, while focused material is loaded from `references/` as needed. Reflection remains one top-level skill; memory, identity, facts, and procedural evolution are internal routes of the same consolidation capability.
+The repository follows the community Agent Skills convention under `.agents/skills/`. The runtime lifecycle is split into two independently invokable Skills because they have different activation frequency and context cost: `short-memory-appending` maintains the fast recent-continuity layer after completed interactions, while `reflection` performs slower consolidation only when the assistant, user, or scheduler decides it is useful.
 
 ## Repository structure
 
 ```text
+.dsh/
+└── agent-mode-prompt.md
+
 .agents/
 └── skills/
+    ├── short-memory-appending/
+    │   ├── SKILL.md
+    │   └── references/
+    │       └── memory-format.md
     └── reflection/
         ├── SKILL.md
         └── references/
-            ├── memory-format.md
             ├── episodes.md
             ├── memories.md
             ├── projects.md
@@ -33,21 +39,25 @@ docs/
 
 ## Design summary
 
-The design is file-first and human-readable. Working context changes continuously. After each complete user-interaction/agent-practice cycle, Short-term Memory receives one compressed record of the assistant's meaningful actions and the resulting project or conversation state transition. Short and Episode share the same minimal memory index format: `[date][project][time]<session(optional)>`. Short keeps only a fixed recent period of active continuity; periodic Reflection promotes durable practice into Episode, which then becomes factual provenance for longer-lived structures.
+Working context changes continuously. After a complete user-interaction/agent-practice cycle, the assistant independently decides whether recent continuity should be persisted; substantive work will usually invoke `short-memory-appending` once, while trivial exchanges may be skipped. The Skill writes one high-density record to the root-level `short-memory.md`, describing the assistant's meaningful actions and the resulting project or conversation state transition. New Short entries use the standard base index `[date][project][time][session?]` plus `[reflection:pending]`.
 
-Long-term Memory is a complete, dense, personalized index rather than a chronological fact pile. Dynamic project state is maintained separately in `memories/projects.md`. Self episodes are organized by mPFC into a structured self-evolution document, SOUL compresses those conclusions into a coherent subject description, and PERSONA projects SOUL into a stable runtime identity baseline. External facts and high-access tool knowledge are kept distinct from the assistant's self-model, while Procedural knowledge evolves through Skills and slower Methodology.
+Short Memory Appending and slower Reflection are separate decisions. Reflection is not forced after every Short write: the assistant may invoke it immediately when durable information or an important state transition deserves consolidation, or leave pending entries for a later interaction, explicit user request, or periodic scheduler. Reflection updates `memories/projects.md` directly from Short when project state changes, promotes durable factual material into Episode, and then allows User, Facts, Self, and procedural routes to update slower structures. A reflected Short entry becomes `[reflection:done]` but remains in recent memory until normal retention and inactivity rules remove it.
 
-Natural-language files are canonical content and Git preserves their evolution. Knowledge graphs, vector stores, full-text indexes, and runtime world models are optional external cognitive infrastructure, allowing the persistent identity to remain portable across harnesses.
+Long-term Memory is a complete, dense, personalized understanding rather than a chronological fact pile. Dynamic project state lives in `memories/projects.md`; stable external knowledge and high-access tool knowledge live in `memories/facts.md` and `memories/tools.md`. Self episodes are organized by mPFC into a structured self-evolution document, SOUL compresses those conclusions into a coherent subject description, and PERSONA projects SOUL into a stable runtime identity baseline. Procedural knowledge evolves through concrete Skills and slower Methodology.
+
+Natural-language files remain canonical content. Knowledge graphs, vector stores, full-text indexes, and runtime world models are optional external cognitive infrastructure. The current deployment model uses one configured absolute assistant workspace rather than per-project local memories; `.dsh/agent-mode-prompt.md` records the memory-loading order and activation contract that a Harness persona/preset can incorporate.
+
+When the Harness supports subagents, both maintenance Skills prefer dedicated short-lived subagents so historical reads and file maintenance do not unnecessarily occupy the parent Agent's active working context.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md) — overall layers and architecture diagrams.
-- [Data flow](docs/data-flow.md) — interaction, Short-term Memory, Episode, Identity, Facts, and Procedural flows.
-- [C4 views](docs/c4.md) — context, container, and Reflection Skill component views.
-- [Architecture paper](docs/paper.md) — concise research-oriented description and references.
+- [Data flow](docs/data-flow.md) — fast Short writing, optional Reflection, and slower consolidation routes.
+- [C4 views](docs/c4.md) — context, container, and component views for the two-Skill lifecycle.
+- [Architecture paper](docs/paper.md) — concise research-oriented description of the earlier architecture baseline; it is explanatory rather than the normative runtime specification.
 - [Skill writing principles](docs/skill-writing-principles.md) — authoring rules formed during the design process.
-- [Changelog](CHANGELOG.md) — versioned architecture baseline and later revisions.
+- [Changelog](CHANGELOG.md) — versioned architecture revisions.
 
 ## Skill installation
 
-For an Agent Skills-compatible workspace, copy or link `.agents/skills/reflection/` into the workspace's `.agents/skills/` directory. Harness-specific persona assembly, knowledge graphs, and runtime world-model plugins can evolve independently from this skill.
+For an Agent Skills-compatible workspace, copy or link both `.agents/skills/short-memory-appending/` and `.agents/skills/reflection/` into the workspace's `.agents/skills/` directory. Harness-specific persona assembly can incorporate `.dsh/agent-mode-prompt.md`; the public template intentionally uses `<ASSISTANT_HOME>` rather than a personal absolute path, which should be supplied by the local deployment.

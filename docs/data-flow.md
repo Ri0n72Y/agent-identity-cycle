@@ -1,89 +1,121 @@
 # Data Flow
 
-数据流以一次完整的“用户交互 → Agent 实践”为最小工作周期。Working Context 在这一轮中吸收用户输入、当前文件、工具调用和产出；当实践结束后，Agent 才写入一次 Short-term Memory，记录本轮值得留下的行动以及行动后发生的项目或会话状态转移。工具调用本身不会逐条生成 Short-term Memory。
+数据流以一次完整的“用户交互 → Agent 实践”为最小工作周期，但周期结束后存在两个彼此独立的维护决策：是否把本轮写入 Short，以及是否立即对待反思的 Short 做更慢的 Reflection。前者通常高频发生，后者可以立即执行，也可以延后到后续交互、用户请求或周期任务。
 
-Short 与 Episode 使用同一标准索引：
+## 完整交互到 Short
 
-```text
-[日期][项目][时间]<会话(optional)>
-```
+对包含实际工作、纠正、决策、状态变化或需要未来继续恢复的交互，助手通常在本轮实践结束后调用一次 `short-memory-appending`。该 Skill 将本轮值得保留的行动和行动后的项目/会话状态转移压缩成一条记录；不会因为一轮中调用了多个工具而生成多个 Short 条目。
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant A as Agent
+    participant A as Parent Agent
     participant T as Tools
-    participant W as Working Context
-    participant S as Short-term Memory
+    participant SA as Short-memory Subagent
+    participant S as short-memory.md
 
     U->>A: 用户交互
-    A->>W: 建立/更新当前上下文
-    A->>T: 执行实践
+    A->>T: 完成本轮需要的实践
     T-->>A: 工具结果与产出
-    A->>W: 综合行动与结果
-    A->>S: 一轮结束后写入行动摘要 + 状态转移
+    A->>A: 判断是否需要保存近期连续性
+    opt 需要写 Short
+        A->>SA: 传递最小行动/状态证据 + ASSISTANT_HOME
+        SA->>S: 读取并追加一条 pending 记录
+        S-->>SA: 写入结果
+        SA-->>A: 简短成功/冲突摘要
+    end
 ```
 
-## Short-term Memory 到 Episode
+如果 Harness 不支持 Subagent，父 Agent 可以直接执行同一写入流程。Subagent 是上下文隔离手段，不改变 Short 的内容语义。
 
-Short-term Memory 保存固定周期内每个项目和会话最近的连续状态。周期性 Reflection 回看这些高密度记录，已经结束或足够稳定、并且未来仍可能支撑长期认识的内容会被整理成 Episode；仍在周期内活跃的记录继续留在 Short，超过周期且没有长期价值的状态直接退出 active memory。这个过程不在 Short 写入之前再增加一层过滤。
+Short 与 Episode 共用基础索引：
+
+```text
+[日期][项目][时间][会话?]
+```
+
+Short 额外携带：
+
+```text
+[reflection:pending|done]
+```
+
+例如：
+
+```text
+[2026-01-15][project-alpha][20:20][architecture-review][reflection:pending]
+```
+
+## Short 到 Reflection
+
+新 Short 默认处于 `pending`。助手在完成本轮工作后独立判断是否值得现在 Reflection：如果出现重要项目状态变化、需要长期保留的事实、自我修正、明确用户偏好、工具知识或方法变化，可以立即触发；如果没有紧迫价值，可以保持 pending，等待未来批量处理。
 
 ```mermaid
 flowchart TD
-    S[Short-term Memory\n近期行动 + 状态转移]
-    R[Periodic Reflection]
-    A{当前去向}
-    E[Episode\n长期事实来源]
-    K[继续留在 Short\n仍在活跃周期]
-    X[移除\n过期且无需长期保留]
+    S[Short entry\nreflection:pending]
+    J{现在需要 Reflection?}
+    I[立即调用 reflection]
+    D[保持 pending\n后续用户 / Agent / Scheduler]
+    R[Reflection]
+    X[标记 reflection:done]
 
-    S --> R
-    R --> A
-    A --> E
-    A --> K
-    A --> X
+    S --> J
+    J -->|是| I --> R --> X
+    J -->|暂时不需要| D --> R
 ```
 
-Episode 继续保持 `Self.md`、`User.md`、`Facts.md` 三个事实来源。一条 Short 在进入 Episode 时可以根据其中不同事实拆分，例如同一轮实践同时包含 Agent 工作方式的修正、用户稳定偏好以及某个工具行为的验证，这些内容可以分别进入 Self、User 与 Facts，同时保留各自必要的上下文和原始时间索引。
+Reflection 完成后，`done` 条目仍然保留在 Short 中，只要它仍处于固定保留周期或对近期连续性有价值。是否已反思和是否从 Short 删除是两件不同的事。
 
-## Episode 到较慢结构
+## Reflection 的慢层路由
+
+Reflection 优先读取待处理的 Short，再只打开当前路由需要的目标文件。项目状态可以直接从 Short 更新，因为 Short 已经保存最新行动和状态转移；Episode 则只保存未来仍值得重新解释的事实来源。
 
 ```mermaid
 flowchart TB
+    S[Short\npending]
+    R[Reflection]
+    PS[Project State\nmemories/projects.md]
     E[Episode]
     U[User]
-    S[Self]
-    F[Facts]
-    L[LTM\n完整个性化索引]
-    PS[Project State\nmemories/projects.md]
-    M[mPFC\n事实 → 自我认知]
-    SO[SOUL\n自我认知 → 连续主体]
-    PE[PERSONA\n主体 → runtime identity]
-    FK[Long-lived Facts]
-    TK[Tool Knowledge]
+    SE[Self]
+    F[Episode Facts]
+    L[LTM\nmemories/long-term.md]
+    FK[Facts\nmemories/facts.md]
+    TK[Tool Knowledge\nmemories/tools.md]
+    M[mPFC]
+    SO[SOUL]
+    PE[PERSONA]
     SK[Skill]
     ME[Methodology]
 
+    S --> R
+    R --> PS
+    R --> E
     E --> U
-    E --> S
+    E --> SE
     E --> F
     U --> L
-    E --> PS
-    S --> M
-    M --> SO
-    SO --> PE
     F --> FK
     F --> TK
+    SE --> M
+    M --> SO
+    SO --> PE
     TK --> SK
     E --> SK
     SK --> ME
 ```
 
-User Episode 可以被整理进 Long-term Memory，使用户背景、习惯和协作方式形成一份完整可读的个性化索引；项目当前阶段和恢复入口进入项目状态记忆；Self Episode 被 mPFC 组织成“为什么这些事实改变了我，以及我因此如何理解自己”的系统化自我演进文档；Facts 中稳定的外部知识进入长期 Facts，高频需要访问的工具行为、错误与解决方式可以形成独立 Tool Knowledge，再为 Procedural 提供事实来源。
+Episode 在这里停留在事实层。一条 Short 如果同时包含用户表达、Agent 自身经历和工具结果，可以分别整理到 `User.md`、`Self.md`、`Facts.md`，但长期用户概括、关于“我因此怎样理解自己”的解释、稳定工具知识和以后应该怎样做，都由后续更慢层继续形成。
+
+## Runtime Memory Loading
+
+当前部署把一个配置好的绝对路径作为 `<ASSISTANT_HOME>`，不为每个项目维护独立记忆。Agent Mode 在新会话、上下文重置或连续性明显缺失时按以下顺序恢复：PERSONA → `short-memory.md` → Long-term Memory → 当前相关 Project State → 按需 Tool Knowledge / Facts → 当前任务需要的 Skills、Bookshelves 和 Project 文件。Episode、mPFC 和 SOUL 不默认进入普通 Working Context。
+
+这一加载顺序属于 Agent Mode / Harness 的运行时提示词，而不是 Reflection Skill 本身；当前 DSH 模板见 `.dsh/agent-mode-prompt.md`。
 
 ## Desktop 与长期结构
 
-Desktop 处在当前工作侧。活跃草稿、临时分析、待办和当前人机合作产物可以持续修改，完成后根据内容进入 Project、Bookshelves、Memory 或 Logs；其中发生的实践仍通过 Short-term Memory 和 Episode 被 Reflection 捕获。
+Desktop 仍然处在当前工作侧。活跃草稿、临时分析、待办和当前人机合作产物持续在 Desktop 中修改，完成后根据内容进入 Project、Bookshelves、Memory 或 Logs；这些工作过程中真正发生的行动与状态变化再通过 Short 和 Reflection 进入长期形成链。
 
 ```mermaid
 flowchart LR
@@ -98,5 +130,3 @@ flowchart LR
     D --> M
     D --> L
 ```
-
-整个数据流让信息随着时间逐渐压缩和抽象，同时保留能够重新解释长期结论的事实来源：越靠近 Working 和 Short，信息越具体、更新越快；越靠近 mPFC、SOUL、Methodology，内容越连续、系统化、更新越慢。

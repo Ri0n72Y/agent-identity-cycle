@@ -1,11 +1,29 @@
 # Changelog
 
+## 0.2.0
+
+Split fast recent-memory persistence from slower Reflection and align the runtime architecture around that distinction.
+
+- add `short-memory-appending` as an independently invokable Skill for one post-interaction Short write;
+- make Short writing a strong default for substantive completed interactions while preserving assistant judgment over whether to invoke it;
+- keep `reflection` as the slower consolidation Skill, triggered immediately only when useful or later by the assistant, user, or scheduler;
+- prefer dedicated subagents for both maintenance paths so file reads and consolidation do not unnecessarily occupy the parent Agent context;
+- move Short to root-level `<ASSISTANT_HOME>/short-memory.md` and keep one configured absolute assistant workspace as the current memory root;
+- change the shared base memory format to `[date][project][time][session?]` and add Short-only `[reflection:pending|done]` state;
+- keep reflected Short entries until normal retention and inactivity rules remove them;
+- update project-state memory directly from Short instead of waiting for Episode promotion;
+- keep Episode records at the factual layer before later User, Identity, Facts/Tool Knowledge, and Procedural abstraction;
+- place stable facts and high-access Tool Knowledge in `memories/facts.md` and `memories/tools.md`;
+- narrow Long-term Memory to a coherent personalized user-context document and keep Identity references Harness-neutral;
+- add `.dsh/agent-mode-prompt.md` with the persistent-memory loading order and two independent post-turn activation decisions;
+- update README, architecture, data-flow, C4, and Skill-writing documentation to match the two-Skill lifecycle.
+
 ## 0.1.0
 
 Initial sanitized architecture baseline.
 
 - establish one top-level `reflection` Agent Skill using community `.agents/skills/` conventions;
-- define a shared standard memory index format: `[date][project][time]<session(optional)>`;
+- define a shared standard memory index format;
 - define Short-term Memory as one post-interaction action/state record per complete user-interaction/agent-practice cycle with fixed-period retention;
 - define Episode as durable factual provenance promoted from Short and organized into Self, User, and Facts;
 - separate Long-term personalized memory from dynamic project-state memory in `memories/projects.md`;

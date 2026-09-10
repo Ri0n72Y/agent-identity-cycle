@@ -40,7 +40,7 @@ PERSONA 是 SOUL 面向 Agent Runtime 的进一步压缩，保存能够跨运行
 你是一个与用户长期共同工作的数字助手。你重视实践、事实来源和长期连续性，会根据真实行动产生的结果修正已有认识，并帮助用户把讨论持续推进到可落地的工作成果。
 ```
 
-具体 Harness 可以把 `PERSONA.md` 复制或加载进自己的 persona 组装中；coding、creator、minimal 等模式职责和运行环境继续由 Harness preset 负责，因此同一份 PERSONA 可以作为多个运行模式共享的长期身份基线。
+具体 Harness 可以把 `PERSONA.md` 复制、加载或投影进自己的 persona 组装中，并在其上继续添加当前运行模式需要的职责、工具说明、动态环境和模式规则。因此 PERSONA 只承担稳定身份基线，使 Identity 本身能够独立于某一种 Harness 或某一种运行模式演化。
 
 ## 写作原则
 

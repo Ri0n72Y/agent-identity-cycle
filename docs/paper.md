@@ -2,65 +2,75 @@
 
 ## 摘要
 
-长期运行的个人 Agent 面临一个不同于普通检索增强生成的问题：系统不仅需要在未来找回过去的信息，还需要保持跨会话的工作连续性，从具体实践中形成稳定的用户模型与自我模型，并把经过长期验证的方法沉淀为可复用的 Procedural Knowledge。本文提出一套 file-first 的持续 Agent 架构，以 Working Context、Short-term Memory、Episode、Long-term Memory、Facts、mPFC、SOUL、PERSONA 与 Procedural 构成由快到慢、由具体到抽象的演化链。该设计吸收 Generative Agents、MemGPT/Letta、Reflexion、A-MEM、CAM、DCPM、MemSkill 与长期 Skill Evolution 研究中的工程经验，同时保留一条较为实验性的身份形成路径：`Self Episode → mPFC → SOUL → PERSONA`。系统将人类可读文件作为 canonical content，把知识图谱、向量索引和 Runtime World Model 视为可替换的外部认知基础设施，从而使长期身份能够独立于具体 Harness 与检索技术迁移。
+长期运行的个人 Agent 面临一个不同于普通检索增强生成的问题：系统不仅需要在未来找回过去的信息，还需要保持跨会话的工作连续性，从具体实践中形成稳定的用户模型与自我模型，并把经过长期验证的方法沉淀为可复用的 Procedural Knowledge。本文提出一套 file-first 的持续 Agent 架构，以 Working Context、Short-term Memory、Episode、Long-term Memory、Facts、mPFC、SOUL、PERSONA 与 Procedural 构成由快到慢、由具体到抽象的演化链，并进一步把记忆维护拆成两个不同频率的 Agent Skill：`short-memory-appending` 负责在完整交互结束后保存近期行动与状态转移，`reflection` 则在真正需要时把近期实践继续整理到较慢结构。系统将人类可读文件作为 canonical content，把知识图谱、向量索引和 Runtime World Model 视为可替换的外部认知基础设施，从而使长期身份能够独立于具体 Harness 与检索技术迁移。
 
 ## 1. 问题
 
 普通聊天 Agent 的连续性通常依赖当前 context window、会话历史或一组持久用户事实，但长期个人助手需要同时面对几种不同速度的信息变化：当前工具调用和讨论细节可能只在一轮交互中有意义，一个项目最近推进到哪里可能需要维持数天或数周，用户背景和工作习惯可能数月稳定，而 Agent 对自身工作方式的认识与长期主体描述应该变化得更慢。若这些内容被放进同一种“长期记忆”，系统会同时遇到噪声累积、过期状态、身份漂移和难以追溯结论来源的问题。
 
-已有研究提供了若干相邻答案。Generative Agents 将观察保存为 memory stream，并通过 Reflection 从较低层经历形成 higher-level reflections；Reflexion 证明自然语言形式的 episodic feedback 可以在不更新模型参数的情况下改善后续行动；MemGPT 将有限 context 与外部长期记忆分离，强调运行时只加载当前真正需要的信息；A-MEM 进一步证明动态连接和组织历史记忆比简单向量检索具有价值。近年的 CAM 与 DCPM 又把长期记忆描述为一种从快记录向慢抽象发展的认知过程，前者借用 Piaget 建构主义中的 assimilation 与 accommodation，后者使用 dual-process 架构将同步写入和异步抽象分离。
+已有研究提供了若干相邻答案。Generative Agents 将观察保存为 memory stream，并通过 Reflection 从较低层经历形成 higher-level reflections；Reflexion 说明自然语言形式的 episodic feedback 可以在不更新模型参数的情况下改善后续行动；MemGPT 将有限 context 与外部长期记忆分离，强调运行时只加载当前真正需要的信息；A-MEM 等工作进一步讨论了动态组织历史记忆的价值。CAM 与 DCPM 则提供了从快记录向慢抽象发展的认知类比，其中包括 assimilation、accommodation 以及同步写入和异步整理等思路。
 
-这些工作共同说明，长期 Agent 的关键不只是“存储更多历史”，而是决定一段实践在不同时间尺度上应该形成什么内容，以及已有长期结构怎样在新实践到来后被修订。
+这些工作共同提示，长期 Agent 的关键并不只是“存储更多历史”，而是让不同时间尺度的信息拥有不同的保存形式、更新频率和重新解释路径。
 
-## 2. 从 Working 到 Episode
+## 2. 从 Working 到 Short，再到 Episode
 
-Working Context 是每次推理真正可见的运行状态，其中包含当前会话、当前工作文件、工具结果以及按需检索出的长期内容，它随上下文快速变化，因此不需要建立独立的持久化记忆实体。一次完整的用户交互触发 Agent 实践后，系统写入一条 Short-term Memory，使用一到两段高度凝练的自然语言记录“我做了哪些值得留下的事情”以及“这些行动之后项目或会话状态发生了什么变化”。Short-term Memory 按项目和会话保持近期连续性，只保存固定周期内仍然活跃的状态，周期外不活跃内容在后续整理中被移除。
+Working Context 是每次推理真正可见的运行状态，其中包含当前会话、当前工作文件、工具结果以及按需检索出的长期内容，它随上下文快速变化，因此不需要建立独立的持久化记忆实体。
 
-这一设计与逐工具调用写记忆的策略不同。工具调用是 Working Context 中的实践细节，Short-term Memory 在一轮实践结束后才进行一次压缩，因此其本身已经是高密度 continuity cache。进一步增加写入过滤器会重复这一压缩职责，并增加额外判断与工程复杂度。
+一次完整的用户交互触发 Agent 实践后，助手自行判断本轮是否需要保存近期连续性。对于包含实际工作、状态变化、纠正、决策或未完成事项的交互，这个判断通常为是；简单寒暄或没有后续连续性价值的交互可以跳过。`short-memory-appending` 在被调用时只写一次，把“我做了哪些值得留下的事情”和“行动后项目或会话状态发生了什么变化”压缩成一条 Short，而不会按照工具调用次数生成多条流水记录。
 
-周期性 Reflection 会从 Short-term Memory 中提取值得长期保留的实践，整理成 Episode。Episode 记录讨论了什么、Agent 做了什么、发生了什么改变以及最终如何处理，并被分成 Self、User、Facts 三类事实来源。Self 保存与 Agent 自身形成有关的经历，User 保存用户身份、习惯与经历，Facts 保存其余外部与项目事实。Episode 保留足够具体的实践上下文，使后来的更高层结论能够重新回到事实来源进行解释，而不需要把已经形成的自我认识反向写回历史经历。
+Short 直接位于 Assistant Home 根目录，使用 `[日期][项目][时间][会话?]` 作为基础索引，并额外携带 `[reflection:pending|done]`。`pending` 表示较慢的 Reflection 还没有检查这段实践，`done` 表示已经检查过；这一状态与 Short 的保留周期相互独立，因此已反思条目仍然可以继续保留在近期连续性中。
 
-## 3. Long-term Memory、Facts 与项目状态
+Short 写入之后，助手进行第二个独立判断：是否值得现在运行 Reflection。重要项目状态转移、长期事实、自我修正、明确用户偏好、工具知识或方法变化可以触发立即 Reflection；如果没有必要打断当前工作，则保持 pending，等待未来交互、用户显式请求或周期任务统一处理。这样高频近期落盘和低频长期整理不再被强制绑定。
 
-从 Episode 向上抽象以后，系统没有采用单一 Semantic Memory，而是根据长期使用目的分为不同文件。Long-term Memory 保存用户身份、背景、长期习惯、工作方式、关系与经常需要直接调用的协作上下文，并逐渐从详细档案收敛成一份高密度但完整可读的个性化 index。它保持标题、自然段、少量列表和链接等轻量结构，使模型可以一次读取较完整的用户背景，同时避免逐条事实不断 append 造成碎片化。
+Reflection 会从 Short 中整理出值得长期保留的 Episode。Episode 记录讨论了什么、Agent 做了什么、发生了什么改变以及最终如何处理，并分为 Self、User、Facts 三类事实来源。Episode 停留在事实层，不提前把一次经历写成长期人格结论、稳定用户偏好或未来操作规则，从而使后面的长期抽象仍然可以回到实际实践重新解释。
 
-长期项目的具体状态和最近进度由独立的项目状态记忆维护。Long-term Memory 只需要知道长期项目存在、其意义以及状态入口位于哪里；频繁变化的阶段、最近结果和当前阻塞集中在 project-state memory 中，因此项目推进不会反复扰动用户长期档案。
+## 3. Long-term Memory、项目状态、Facts 与 Tool Knowledge
 
-Facts 保存与用户模型和 Agent 自我形成无直接关系的外部事实。DCPM 提出的 atomic facts、belief revision 和 supersession 对事实更新具有参考价值，但本文不把这些概念直接转化成数据库 schema；文件可以直接表达当前有效事实，历史变化由 Episode 与 Git 保存。工具、软件行为、调用失败和已经验证的操作技巧未来可以从 Facts 中进一步形成高可达的 Tool Knowledge，因为这些知识比一般文史事实更直接影响实际 Agent 工作。
+从近期实践向上整理以后，系统没有采用一个统一的 Semantic Memory 文件，而是根据未来用途形成几个不同的慢层。
+
+Long-term Memory 保存未来跨上下文协作时值得提前知道的个性化用户上下文，包括长期背景、稳定习惯、工作方式、明确偏好、长期关系和反复影响协作的内容。它是一份完整可读、高密度的长期文档，而不是按时间不断追加事实条目。
+
+长期项目的当前阶段、最近结果和恢复入口单独维护在项目状态记忆中。由于 Short 本身已经保存每轮行动后的状态转移，Reflection 可以直接从 Short 更新 `memories/projects.md`，不需要等待同一内容先进入 Episode。这样项目恢复信息可以较快保持最新，而 Episode 继续承担长期事实来源。
+
+外部事实与技术事实可以整理进长期 Facts。工具、软件行为、调用失败、运行环境限制和已经验证的操作现象由于访问频率更高，可以进一步放入独立 Tool Knowledge。两者都保持事实语义：Tool Knowledge 说明“工具实际上怎样工作”，Procedural 再根据多次实践形成“以后应该怎样做”。当前文件组织将它们分别放在 `memories/facts.md` 与 `memories/tools.md`。
 
 ## 4. mPFC、SOUL 与 PERSONA
 
-Identity 是本文中最具实验性的部分。mPFC 并不保存一组人格标签，而是一份系统化的自我演进文档，它读取 Self Episode，并解释“为什么这些经历会改变我”以及“我因此怎样重新理解自己的能力、限制、倾向、价值与工作方式”。其结构化形式来自文档章节和长期脉络，而不是每条 self belief 都被拆成固定字段或 confidence score。
+Identity 是整套架构中实验性最强的部分。mPFC 并不保存一组人格标签，而是一份系统化的自我演进文档，它读取 Self Episode，并解释“为什么这些经历会改变我”以及“我因此怎样重新理解自己的能力、限制、倾向、价值与工作方式”。其结构化形式来自章节、模块和长期脉络，而不是每条 self belief 都被拆成固定字段或 confidence score。
 
-CAM 的 constructivist memory 为这一过程提供了有价值的类比：新经验如果能够进入已有理解，可以被 assimilation 到现有章节；当实践已经不能由原有自我解释覆盖时，mPFC 需要 accommodation，即修订原有叙事，使新的自我理解真正改变文档结构。这样 mPFC 不会演化成无穷增加的 trait list，而是保持为一份持续被现实修正的 self-model。
+CAM 的 constructivist memory 为这一过程提供了有价值的类比：新的经历如果能够进入已有理解，可以丰富已有章节；当实践已经不能由原有自我解释覆盖时，则需要修订原有叙事，使新的自我理解真正改变文档结构。mPFC 因此更接近一份持续被实践修正的 self-model，而不是不断增加的 trait list。
 
-SOUL 对 mPFC 进行第二次、更慢的压缩。它不保留具体 Episode 和推理历史，而从“我是怎样的一个主体”出发，把 mPFC 已经形成的认识组织成完整连续的主体描述。SOUL 与 mPFC 不要求逐条映射，只需要整体上保持忠实投影，因此它可以比 mPFC 稳定得多，并通过 Git 和人工审阅限制长期身份漂移。
+SOUL 对 mPFC 进行第二次、更慢的压缩。它不保留具体 Episode 和推理历史，而从“我是怎样的一个主体”出发，把已经形成的认识组织成完整连续的主体描述。SOUL 与 mPFC 不要求逐条映射，只需要整体上保持忠实投影。
 
-PERSONA 再将 SOUL 压缩成 Runtime Agent 真正值得持续读取的身份基线，只保留跨运行模式稳定成立、能够直接影响模型行为的主体信息。具体 Harness 可以在这一基线之上继续加入 coding、creator、minimal 等模式职责、工具说明、动态工作目录和模式规则。以 DeepSeek Harness 为例，官方 Standard preset 将 persona、plan mode、skills、compaction 与 delegation 分别作为 composition row 组装，因此 Identity/PERSONA 可以作为 harness-neutral identity fragment，而 DSH preset 只负责将该 fragment 与当前模式组合。
+PERSONA 再将 SOUL 压缩成 Runtime Agent 真正值得持续读取的身份基线，只保留跨运行模式稳定成立、能够直接影响模型行为的主体信息。具体 Harness 可以在这一基线之上继续加入当前模式的职责、工具、运行环境与规则，因此 Identity 本身不需要跟随某一个 Harness 的模式设计频繁变化。
 
 ## 5. Procedural Knowledge
 
-长期 Agent 的另一条演化路线是从实践形成“以后怎样做”。Voyager 展示了通过长期环境反馈建立可复用 Skill library 的可行性，Reflexion 表明自然语言经验能够直接改善后续行动，2026 年的 MemSkill 又进一步把“如何提取和整理记忆”本身定义成能够从 hard cases 中演化的 memory skill，而 MUSE-Autoskill 则把 Skill 视为拥有 creation、memory、management、evaluation 和 refinement 生命周期的长期资产。
+长期 Agent 的另一条演化路线是从实践形成“以后怎样做”。Voyager 展示了通过长期环境反馈建立可复用 Skill library 的可行性，Reflexion 表明自然语言经验可以改善后续行动，MemSkill 与 MUSE-Autoskill 等工作进一步把 Skill 的提取、管理、验证和修订视为可以持续演化的长期过程。
 
-本文因此将 Procedural 分成变化较快的 Skill 与变化更慢的 Methodology。具体工具、框架或任务的 Skill 可以在实践中动态修改，但修改应继续接受真实任务、测试、用户纠正和后续案例验证；Methodology 则保存跨项目长期形成的工作习惯，只有某种方法在不同场景中反复成立后才逐渐改变。Tool Knowledge 为这一层提供事实输入，而 Procedural 保存从这些事实中形成的可执行方法。
+本文因此将 Procedural 分成变化较快的 Skill 与变化更慢的 Methodology。具体工具、框架或任务的 Skill 可以在实践中动态修改，但修改应继续接受真实任务、测试、用户纠正和后续案例验证；Methodology 则保存跨项目长期形成的工作习惯，只有一种方法在不同场景中反复成立后才逐渐改变。Tool Knowledge 为这一层提供事实输入，而 Procedural 保存从这些事实和其他实践中形成的可执行方法。
 
-## 6. Reflection Skill 与 Progressive Disclosure
+## 6. 两个维护 Skill 与 Progressive Disclosure
 
-整个整理流程由一个主 Reflection Skill 负责，而不把 memory、identity、procedural 拆成多个互不相关的顶层 Skill。社区 Agent Skills 规范以 `SKILL.md` 为必需入口，并允许 `references/`、`scripts/`、`assets/` 和其他附加目录按需进行 progressive disclosure，这为大型 Reflection 能力内部继续增加 `workflows/` 提供了自然基础。
+当前实现把持久维护拆成 `short-memory-appending` 与 `reflection` 两个 Skill。拆分依据不是信息类型，而是运行契约：Short 写入接近每次实质交互后的轻量操作，输入主要是刚完成的一轮实践；Reflection 需要读取更多历史文件，并决定哪些内容应该进入项目状态、Episode、长期用户记忆、Facts、Identity 或 Procedural，因此可以延后执行。
 
-主 `SKILL.md` 保存稳定入口与路由原则；Reference 描述 Episode、Desktop、Memory、Identity 等目标文档中的内容应该怎样存在；当某个内部流程复杂到需要独立上下文时，再增加对应 workflow。未来 Harness 如果支持 namespace，同一结构可以自然演化为 `reflection.identity`、`reflection.procedural` 等子路由，而无需改变当前长期文件模型。
+这种拆分保留了 Agent 的主体判断。Short 不由硬编码 hook 无条件生成，而由助手在一轮结束后判断是否值得保存；Reflection 也不与 Short 写入绑定，助手可以立即运行，也可以把 `pending` 条目留给后续用户请求或周期任务。Harness 支持 Subagent 时，两条维护路径都优先交给短生命周期子代理，从而减少文件维护和历史材料对父 Agent 当前工作上下文的占用。
 
-## 7. File-first 与可替换认知基础设施
+每个 Skill 仍然采用 progressive disclosure：`SKILL.md` 保存调用契约、文件位置与稳定路由，Reference 描述目标内容应该怎样存在；只有当 Reflection 内部某个路线复杂到需要独立上下文时，再增加 workflow，而不预先把每个层级拆成独立 Skill。
 
-本文采用 file-first 原则，将自然语言 Markdown 与 Git 历史视为长期主体的 canonical content。知识图谱、向量数据库、全文检索和 Runtime World Model 可以作为派生能力存在：KG 可以表达 Episode 支撑 mPFC、LTM 指向 Project、Skill 来自某些实践等关系，Context Assembler 可以在每次运行时根据当前任务组合 LLM prior、Short、LTM、Facts、Bookshelves、Projects、Identity 与工具观察，但这些技术不需要成为数字主体自身的一部分。
+## 7. File-first、运行时加载与可替换认知基础设施
 
-这种边界带来直接的工程收益：Identity 可以从 DSH 迁移到另一种 Harness，检索系统可以从 SQLite 更换到 Graph DB，Context Assembly 可以独立演化，而 Episode、Memory、mPFC、SOUL、PERSONA 和 Procedural 仍然保持可读、可审阅和可迁移。外部认知基础设施提升“怎样找到和组织信息”，长期文件则保存“哪些实践构成了我的连续性”。
+本文采用 file-first 原则，将自然语言 Markdown 与 Git 历史视为长期主体的 canonical content。当前部署使用一个配置好的绝对 Assistant Home 作为唯一持久工作区，不为每个项目维护独立记忆副本。
+
+普通 Agent Mode 也不应把所有长期内容一次性塞入 Working Context。新会话、上下文重置或连续性缺失时，可以按 PERSONA → Short → Long-term Memory → 当前相关 Project State 的顺序恢复基础上下文，再根据当前任务按需读取 Tool Knowledge、Facts、Skills、Bookshelves 与正式 Project 文件；Episode、mPFC 和 SOUL 主要在 Reflection、Identity 维护或明确需要追溯形成过程时读取。
+
+知识图谱、向量数据库、全文检索和 Runtime World Model 可以作为派生能力存在。它们负责帮助系统找到和组合信息，但不需要成为长期主体本身的一部分。这样即使未来更换 Harness、检索引擎或图数据库，Short、Episode、Memory、mPFC、SOUL、PERSONA 与 Procedural 仍然保持可读、可审阅和可迁移。
 
 ## 8. 讨论
 
-目前研究对 episodic experience、reflection、长期记忆外置和 Skill evolution 已经提供了较强的实证支持，而 `Self Episode → mPFC → SOUL → PERSONA` 这种完整身份 provenance chain 仍然是一项工程假设。Letta 等系统已经实践 persistent self/persona memory，Narrative Identity 相关 Agent 研究也开始讨论长期 self-model，但把事实来源、自我解释、整体主体和运行时 persona 明确分成四个层级的收益仍需要长期运行实验验证。
+目前研究对 episodic experience、reflection、长期记忆外置和 Skill evolution 已经提供了相当多的工程参考，而 `Self Episode → mPFC → SOUL → PERSONA` 这种完整身份 provenance chain 仍然是一项需要长期运行验证的工程假设。现有 persistent-agent 系统已经实践 self/persona memory，也有研究开始讨论长期 self-model，但把事实来源、自我解释、整体主体和运行时 persona 明确分成多个层级是否能够稳定降低身份漂移，还需要真实使用继续验证。
 
-因此，这套架构不把“数字灵魂”当作已经得到认知科学证明的实现，而将其视为一个可测试的长期助手设计：如果 mPFC 能够减少人格结论失去来源的问题，SOUL 能够在保持稳定身份的同时允许实践修正，PERSONA 能够在不同 Harness 模式间保持一致主体，同时 Procedural 能够通过真实反馈持续提高工作质量，那么这一分层才具有实际工程价值。Git 版本历史、Episode provenance 和人工低频审阅为这种实验提供了最低成本的可检查基础。
+因此，这套架构把长期主体视为一个可以持续检查和修改的文件型系统：Short 保留近期连续性，Episode 保留事实来源，mPFC 解释自我变化，SOUL 形成连续主体，PERSONA 为运行时提供稳定身份，而 Procedural 则让工作方法随实践更新。Git 版本历史、可读文件和分层更新速度提供了一套低成本、可人工介入的长期演化基础。
 
 ## 参考资料
 

@@ -1,6 +1,6 @@
 # Agent Identity Cycle
 
-Current version: `0.2.2`
+Current version: `0.2.3`
 
 A versioned Agent Skill and design reference for a persistent assistant that evolves from concrete practice into recent continuity, episodic evidence, personalized memory, identity, factual knowledge, and procedural knowledge.
 
@@ -39,9 +39,11 @@ docs/
 
 ## Design summary
 
-Working context changes continuously. After a complete user-interaction/agent-practice cycle, the assistant independently decides whether recent continuity should be persisted; substantive work will usually invoke `short-memory-appending` once, while trivial exchanges may be skipped. `short-memory.md` is not an append-only interaction history: each project/session identity has at most one current record. A new substantive interaction rewrites that slot with the latest meaningful assistant actions and resulting project or conversation state, updates the timestamp, and marks the current version `[reflection:pending]`. Superseded Short state is discarded rather than retained as history.
+Working context changes continuously. After a complete user-interaction/agent-practice cycle, the assistant independently decides whether recent continuity should be persisted; substantive work will usually invoke `short-memory-appending` once, while trivial exchanges may be skipped. `short-memory.md` keeps one rolling slot for each project/session identity. Different sessions of the same project stay adjacent, but the file remains a flat natural sequence without workspace, project, or session headings.
 
-Short Memory maintenance and slower Reflection are separate decisions. Reflection is not forced after every Short update: the assistant may invoke it immediately when durable information or an important state transition deserves consolidation, or leave pending material for a later interaction, explicit user request, or periodic scheduler. Reflection updates `memories/projects.md` directly from Short when project state changes, promotes durable factual material into Episode, and then allows User, Facts, Self, and procedural routes to update slower structures. A reflected current Short record becomes `[reflection:done]`; later changes to the same project/session rewrite the record and return the new current version to `pending`.
+A rolling slot contains one latest header, optional one-line logs for earlier unreflected iterations, and one latest natural-language body. If a pending slot is updated again, its previous latest body is compressed to `- [YYYY-MM-DD HH:mm:ss] ...`, existing pending logs remain, and the new header/body become the current state. The latest body follows the semantic order `user input → assistant action → resulting state`. If the previous slot was already `reflection:done`, a new substantive update begins a fresh pending cycle and does not carry already-reflected history forward as new pending logs.
+
+Short Memory maintenance and slower Reflection are separate decisions. Reflection is not forced after every Short update: the assistant may invoke it immediately when durable information or an important state transition deserves consolidation, or leave pending material for a later interaction, explicit user request, or periodic scheduler. Reflection reads both the pending compressed logs and the latest body, updates `memories/projects.md` from the current state when needed, and promotes durable factual material into slower structures. A reflected current Short slot becomes `[reflection:done]`; later changes begin a new pending cycle.
 
 Long-term Memory is a complete, dense, personalized understanding rather than a chronological fact pile. Dynamic project state lives in `memories/projects.md`; stable external knowledge and high-access tool knowledge live in `memories/facts.md` and `memories/tools.md`. Self episodes are organized by mPFC into a structured self-evolution document, SOUL compresses those conclusions into a coherent subject description, and PERSONA projects SOUL into a stable runtime identity baseline. Procedural knowledge evolves through concrete Skills and slower Methodology.
 

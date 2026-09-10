@@ -1,6 +1,6 @@
 # Agent Identity Cycle
 
-Current version: `0.2.0`
+Current version: `0.2.1`
 
 A versioned Agent Skill and design reference for a persistent assistant that evolves from concrete practice into recent continuity, episodic evidence, personalized memory, identity, factual knowledge, and procedural knowledge.
 

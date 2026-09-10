@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.3
+
+Refine Short-term Memory into a rolling slot that preserves unreflected iteration progress without becoming an append-only history.
+
+- define one rolling Short slot for each project/session identity;
+- when a pending slot is updated, compress the previous latest body into one `- [YYYY-MM-DD HH:mm:ss] ...` log line and preserve earlier pending logs;
+- keep the newest header and latest body as the current state, with the body following `user input → assistant action → resulting state`;
+- when a done slot changes again, begin a fresh pending cycle without carrying already-reflected history forward as pending logs;
+- keep different sessions of the same project adjacent in `short-memory.md` while preserving a flat natural document without project/workspace heading hierarchies;
+- standardize memory timestamps at second precision so rolling logs can preserve the previous cycle time;
+- make Reflection consume both pending compressed logs and the latest body before marking the rolling slot done;
+- update README and architecture/data-flow documentation to match the rolling-slot model.
+
 ## 0.2.2
 
 Change Short-term Memory from append-only recent history to one latest-state slot per project/session.

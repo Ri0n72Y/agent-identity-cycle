@@ -4,10 +4,6 @@
 
 Desktop 保存 Agent 与用户当前正在进行的工作，是围绕任务、文件和上下文形成的共同工作空间。它让一次对话产生的草稿、分析、计划和临时产物能够在后续会话中继续推进，直到形成稳定成果并进入更长期的位置。
 
-形成关系：
-
-Experience → Desktop → Project / Bookshelves / Memory / Logs
-
 ## Desktop 的内容
 
 Desktop 的基本单位是文件。每个文件代表当前活跃上下文中的一项人机合作产物，通常仍处于草稿、讨论或临时整理状态；Agent 也可以在 Desktop 中留下为当前工作服务的临时文件。内容完成以后，根据实际用途进入对应 Project、Bookshelves、Memory 或 Logs。
@@ -22,18 +18,4 @@ Desktop 有一个稳定的 `todo.md`，用于快速记录接下来需要处理�
 
 Desktop 内容优先使用自然语言和完整上下文。索引、关系和其他结构化信息可以由工具层生成，不要求人在创作过程中维护大量机器字段。
 
-## 生命周期
-
-```text
-新问题出现
-↓
-进入 Desktop
-↓
-人与 Agent 共同讨论和修改
-↓
-形成稳定成果
-↓
-Project / Bookshelves / Memory / Logs
-```
-
-Desktop 本身用于承载活跃工作，完成后的长期价值由目标位置保存；其中发生的实践仍然通过 Short-term Memory 与 Episode 进入 Reflection 的长期形成链。
+维护 Desktop 时应围绕当前是否仍在工作来判断文件状态：仍需继续讨论、修改或依赖当前上下文的内容继续保留；已经形成稳定成果的文件根据实际用途移出活跃工作面。`todo.md` 也直接修订当前有效待办，不保留已经失效的长期清单。

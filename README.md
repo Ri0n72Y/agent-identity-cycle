@@ -1,6 +1,6 @@
 # Agent Identity Cycle
 
-Current version: `0.2.1`
+Current version: `0.2.2`
 
 A versioned Agent Skill and design reference for a persistent assistant that evolves from concrete practice into recent continuity, episodic evidence, personalized memory, identity, factual knowledge, and procedural knowledge.
 
@@ -39,9 +39,9 @@ docs/
 
 ## Design summary
 
-Working context changes continuously. After a complete user-interaction/agent-practice cycle, the assistant independently decides whether recent continuity should be persisted; substantive work will usually invoke `short-memory-appending` once, while trivial exchanges may be skipped. The Skill writes one high-density record to the root-level `short-memory.md`, describing the assistant's meaningful actions and the resulting project or conversation state transition. New Short entries use the standard base index `[date][project][time][session?]` plus `[reflection:pending]`.
+Working context changes continuously. After a complete user-interaction/agent-practice cycle, the assistant independently decides whether recent continuity should be persisted; substantive work will usually invoke `short-memory-appending` once, while trivial exchanges may be skipped. `short-memory.md` is not an append-only interaction history: each project/session identity has at most one current record. A new substantive interaction rewrites that slot with the latest meaningful assistant actions and resulting project or conversation state, updates the timestamp, and marks the current version `[reflection:pending]`. Superseded Short state is discarded rather than retained as history.
 
-Short Memory Appending and slower Reflection are separate decisions. Reflection is not forced after every Short write: the assistant may invoke it immediately when durable information or an important state transition deserves consolidation, or leave pending entries for a later interaction, explicit user request, or periodic scheduler. Reflection updates `memories/projects.md` directly from Short when project state changes, promotes durable factual material into Episode, and then allows User, Facts, Self, and procedural routes to update slower structures. A reflected Short entry becomes `[reflection:done]` but remains in recent memory until normal retention and inactivity rules remove it.
+Short Memory maintenance and slower Reflection are separate decisions. Reflection is not forced after every Short update: the assistant may invoke it immediately when durable information or an important state transition deserves consolidation, or leave pending material for a later interaction, explicit user request, or periodic scheduler. Reflection updates `memories/projects.md` directly from Short when project state changes, promotes durable factual material into Episode, and then allows User, Facts, Self, and procedural routes to update slower structures. A reflected current Short record becomes `[reflection:done]`; later changes to the same project/session rewrite the record and return the new current version to `pending`.
 
 Long-term Memory is a complete, dense, personalized understanding rather than a chronological fact pile. Dynamic project state lives in `memories/projects.md`; stable external knowledge and high-access tool knowledge live in `memories/facts.md` and `memories/tools.md`. Self episodes are organized by mPFC into a structured self-evolution document, SOUL compresses those conclusions into a coherent subject description, and PERSONA projects SOUL into a stable runtime identity baseline. Procedural knowledge evolves through concrete Skills and slower Methodology.
 
@@ -52,7 +52,7 @@ When the Harness supports subagents, both maintenance Skills prefer dedicated sh
 ## Documentation
 
 - [Architecture](docs/architecture.md) — overall layers and architecture diagrams.
-- [Data flow](docs/data-flow.md) — fast Short writing, optional Reflection, and slower consolidation routes.
+- [Data flow](docs/data-flow.md) — fast Short maintenance, optional Reflection, and slower consolidation routes.
 - [C4 views](docs/c4.md) — context, container, and component views for the two-Skill lifecycle.
 - [Architecture paper](docs/paper.md) — concise research-oriented description of the earlier architecture baseline; it is explanatory rather than the normative runtime specification.
 - [Skill writing principles](docs/skill-writing-principles.md) — authoring rules formed during the design process.

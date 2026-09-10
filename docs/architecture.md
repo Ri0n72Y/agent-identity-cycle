@@ -1,14 +1,14 @@
 # Persistent Agent Identity Cycle Architecture
 
-这套架构把长期数字助手理解为一个持续工作的文件型主体，并把“近期连续性落盘”和“较慢的长期整理”拆成两个不同频率的能力。Working Context 负责即时工作；`short-memory-appending` 在一次完整用户交互与 Agent 实践结束后，由助手自行判断是否调用，并在需要时把行动与状态转移写入根目录的 `short-memory.md`；`reflection` 则只在值得立即整理、用户主动要求或周期性任务触发时运行，将 Short 中尚未反思的内容继续推进到项目状态、Episode、Long-term Memory、Facts、Identity 与 Procedural。
+这套架构把长期数字助手理解为一个持续工作的文件型主体，并把“近期连续性落盘”和“较慢的长期整理”拆成两个不同频率的能力。Working Context 负责即时工作；`short-memory-appending` 在一次完整用户交互与 Agent 实践结束后，由助手自行判断是否调用，并在需要时维护根目录 `short-memory.md` 中对应项目/会话的最新状态；`reflection` 则只在值得立即整理、用户主动要求或周期性任务触发时运行，将 Short 中尚未反思的当前内容继续推进到项目状态、Episode、Long-term Memory、Facts、Identity 与 Procedural。
 
-Short 与 Episode 共用基础索引 `[日期][项目][时间][会话?]`。Short 在其后追加 `[reflection:pending|done]`，用于说明这条近期记忆是否已经被慢速 Reflection 检查；`done` 不意味着立即删除，Short 的删除仍由固定保留周期与活跃状态决定。
+Short 与 Episode 共用基础索引 `[日期][项目][时间][会话?]`。Short 在其后追加 `[reflection:pending|done]`。同一项目/会话在 Short 中只保留一条最新记录；新的实践会重写这一槽位、更新时间并重新标记为 `pending`，旧状态不会继续作为 Short 历史保留。
 
 ```mermaid
 flowchart TB
     W[Working Context\n当前会话 / 工具结果 / 当前文件]
     SA[short-memory-appending\n高频、助手自主判断]
-    S[short-memory.md\n近期行动 + 状态转移]
+    S[short-memory.md\n每项目/会话一个最新状态槽位]
     R[reflection\n低频 consolidation]
     E[Episode\nSelf / User / Facts]
     L[LTM\n完整个性化用户上下文]
@@ -41,7 +41,9 @@ flowchart TB
 
 Short Memory Appending 与 Reflection 是两个独立决策。对大多数包含实际工作、状态变化、纠正或未完成事项的交互，助手通常会在一轮结束后调用一次 `short-memory-appending`；简单寒暄或完全没有连续性价值的交互可以不调用。这个判断属于 Agent 自身，不额外增加一个写入前过滤器，也不会把每次工具调用拆成独立 Short。
 
-Reflection 不需要紧跟每一次 Short 写入。新条目首先以 `reflection:pending` 保存在近期连续性中；当其中包含应该立即进入慢层的重要变化时，助手可以主动触发 Reflection，也可以保留到后续交互、用户显式要求或周期调度中批量处理。Reflection 完成对该条目的必要路由后将标记改为 `reflection:done`，但条目仍可继续留在 Short 中帮助近期恢复。
+Short 的维护方式是更新，而不是不断累积同一工作上下文的历史快照。若当前项目/会话已经存在记录，本轮会直接重写该记录，使正文只表达最近值得保留的行动以及当前状态；仍然有效的信息可以被带入新版本，已经过时的行动和状态则被丢弃。没有对应槽位时才创建新记录。
+
+Reflection 不需要紧跟每一次 Short 更新。当前记录每次发生实质更新后都标记为 `reflection:pending`；当其中包含应该立即进入慢层的重要变化时，助手可以主动触发 Reflection，也可以留到后续交互、用户显式要求或周期调度中处理。Reflection 完成检查后将当前版本标记为 `reflection:done`；如果之后同一项目/会话再次发生变化，新版本会重新成为 `pending`。
 
 当 Harness 支持 Subagent 时，这两个维护过程都优先交给短生命周期子代理执行。父 Agent 只提供本轮必要证据、绝对 Assistant Home 路径和当前项目/会话标签，并只接收简短结果，从而让当前工作上下文尽量保留给用户任务本身。
 
@@ -49,8 +51,8 @@ Reflection 不需要紧跟每一次 Short 写入。新条目首先以 `reflectio
 
 ```mermaid
 flowchart LR
-    A[Working\nfastest] --> B[Short Append]
-    B --> C[Short Memory]
+    A[Working\nfastest] --> B[Short Update]
+    B --> C[Latest Short State]
     C --> D[Reflection]
     D --> E[Project State / Episode]
     E --> F[LTM / Facts / mPFC / Skill]

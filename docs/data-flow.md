@@ -1,10 +1,10 @@
 # Data Flow
 
-数据流以一次完整的“用户交互 → Agent 实践”为最小工作周期，但周期结束后存在两个彼此独立的维护决策：是否把本轮写入 Short，以及是否立即对待反思的 Short 做更慢的 Reflection。前者通常高频发生，后者可以立即执行，也可以延后到后续交互、用户请求或周期任务。
+数据流以一次完整的“用户交互 → Agent 实践”为最小工作周期，但周期结束后存在两个彼此独立的维护决策：是否更新本轮对应的 Short，以及是否立即对待反思的 Short 做更慢的 Reflection。前者通常高频发生，后者可以立即执行，也可以延后到后续交互、用户请求或周期任务。
 
 ## 完整交互到 Short
 
-对包含实际工作、纠正、决策、状态变化或需要未来继续恢复的交互，助手通常在本轮实践结束后调用一次 `short-memory-appending`。该 Skill 将本轮值得保留的行动和行动后的项目/会话状态转移压缩成一条记录；不会因为一轮中调用了多个工具而生成多个 Short 条目。
+对包含实际工作、纠正、决策、状态变化或需要未来继续恢复的交互，助手通常在本轮实践结束后调用一次 `short-memory-appending`。Short 按项目/会话维护当前状态，而不是按轮次累积历史：如果该项目/会话已经存在记录，就重写这一条；如果不存在，才创建新记录。
 
 ```mermaid
 sequenceDiagram
@@ -18,15 +18,20 @@ sequenceDiagram
     A->>T: 完成本轮需要的实践
     T-->>A: 工具结果与产出
     A->>A: 判断是否需要保存近期连续性
-    opt 需要写 Short
+    opt 需要更新 Short
         A->>SA: 传递最小行动/状态证据 + ASSISTANT_HOME
-        SA->>S: 读取并追加一条 pending 记录
+        SA->>S: 查找同项目/会话记录
+        alt 已存在
+            SA->>S: 重写为最新行动 + 当前状态
+        else 不存在
+            SA->>S: 创建一个当前状态记录
+        end
         S-->>SA: 写入结果
         SA-->>A: 简短成功/冲突摘要
     end
 ```
 
-如果 Harness 不支持 Subagent，父 Agent 可以直接执行同一写入流程。Subagent 是上下文隔离手段，不改变 Short 的内容语义。
+如果 Harness 不支持 Subagent，父 Agent 可以直接执行同一流程。Subagent 是上下文隔离手段，不改变 Short 的内容语义。
 
 Short 与 Episode 共用基础索引：
 
@@ -46,33 +51,35 @@ Short 额外携带：
 [2026-01-15][project-alpha][20:20][architecture-review][reflection:pending]
 ```
 
+同一项目/会话只保留一条 Short。新一轮更新时，时间更新为当前实践发生时间，正文重新凝练为现在仍然需要恢复的行动与状态；旧状态不继续留在 Short 中。仍然有效的信息可以保留在新版本里，已经过时的内容直接丢弃。
+
 ## Short 到 Reflection
 
-新 Short 默认处于 `pending`。助手在完成本轮工作后独立判断是否值得现在 Reflection：如果出现重要项目状态变化、需要长期保留的事实、自我修正、明确用户偏好、工具知识或方法变化，可以立即触发；如果没有紧迫价值，可以保持 pending，等待未来批量处理。
+每个新建或实质更新后的 Short 当前版本都处于 `pending`。助手在完成本轮工作后独立判断是否值得现在 Reflection：如果出现重要项目状态变化、需要长期保留的事实、自我修正、明确用户偏好、工具知识或方法变化，可以立即触发；如果没有紧迫价值，可以保持 pending，等待未来处理。
 
 ```mermaid
 flowchart TD
-    S[Short entry\nreflection:pending]
+    S[Current Short state\nreflection:pending]
     J{现在需要 Reflection?}
     I[立即调用 reflection]
     D[保持 pending\n后续用户 / Agent / Scheduler]
     R[Reflection]
-    X[标记 reflection:done]
+    X[当前版本标记 reflection:done]
 
     S --> J
     J -->|是| I --> R --> X
     J -->|暂时不需要| D --> R
 ```
 
-Reflection 完成后，`done` 条目仍然保留在 Short 中，只要它仍处于固定保留周期或对近期连续性有价值。是否已反思和是否从 Short 删除是两件不同的事。
+Reflection 完成后，当前版本可以标记为 `done`。如果同一项目/会话之后再次发生实质变化，Short 会被重写成新的当前状态，并重新成为 `pending`；`done` 不会跨版本继承。
 
 ## Reflection 的慢层路由
 
-Reflection 优先读取待处理的 Short，再只打开当前路由需要的目标文件。项目状态可以直接从 Short 更新，因为 Short 已经保存最新行动和状态转移；Episode 则只保存未来仍值得重新解释的事实来源。
+Reflection 优先读取待处理的当前 Short，再只打开当前路由需要的目标文件。项目状态可以直接从 Short 更新，因为 Short 已经保存最新行动和状态转移；Episode 则只保存未来仍值得重新解释的事实来源。
 
 ```mermaid
 flowchart TB
-    S[Short\npending]
+    S[Current Short\npending]
     R[Reflection]
     PS[Project State\nmemories/projects.md]
     E[Episode]

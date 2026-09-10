@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1
+
+Tighten Reflection references so they describe only their local content model and internal document evolution.
+
+- remove cross-layer `形成关系` diagrams and redundant routing summaries from Reflection references;
+- keep Episode focused on factual practice records without promoting conclusions into later layers;
+- keep Long-term Memory focused on coherent personalized understanding rather than its upstream source;
+- keep project-state memory focused on current recoverable project context rather than Reflection input routing;
+- keep Facts and Tool Knowledge within one local factual subsystem and remove downstream Procedural routing;
+- keep Identity focused on the internal `mPFC → SOUL → PERSONA` progression without Harness assembly instructions;
+- keep Procedural focused on Skill and Methodology without restating the whole memory lifecycle;
+- simplify Desktop to active-file maintenance and remove duplicated system lifecycle diagrams.
+
 ## 0.2.0
 
 Split fast recent-memory persistence from slower Reflection and align the runtime architecture around that distinction.

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.2
+
+Change Short-term Memory from append-only recent history to one latest-state slot per project/session.
+
+- keep at most one Short record for each project/session identity;
+- rewrite the matching record after a substantive interaction instead of appending another historical snapshot;
+- update the record timestamp and current-state summary on each rewrite;
+- discard superseded Short state while carrying forward only information that remains relevant to current continuity;
+- reset the rewritten current version to `reflection:pending`; a previous `done` marker does not carry across state changes;
+- treat retention windows as cleanup across inactive project/session slots rather than history retention inside one slot;
+- update README and architecture/data-flow documentation to match the latest-state model.
+
 ## 0.2.1
 
 Tighten Reflection references so they describe only their local content model and internal document evolution.

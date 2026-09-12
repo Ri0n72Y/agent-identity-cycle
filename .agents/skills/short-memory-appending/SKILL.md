@@ -13,7 +13,7 @@ Invoke this skill at most once for one complete user-interaction/agent-practice 
 
 `short-memory.md` remains a flat, naturally ordered document. Different sessions belonging to the same project should stay adjacent so the project's recent contexts can be read together, but do not add workspace, project, or session headings and do not introduce a nested hierarchy. Preserve the existing natural order as much as possible; the only grouping requirement is that slots for the same project remain together.
 
-Use the standard memory format in [references/memory-format.md](references/memory-format.md). A rolling slot has one latest header, optional compressed pending-history lines, and one latest body. The latest body should preserve the semantic order `user input → assistant action → resulting state`: briefly state what the user asked, clarified, corrected, or decided; what the assistant actually did in response; and what the project or conversation has now advanced to. Keep this as natural language rather than fixed fields.
+Use the standard memory format in [references/memory-format.md](references/memory-format.md). A rolling slot has one latest header, optional compressed pending-history lines, and one latest body. The latest body should preserve the semantic order `user input → assistant action → resulting state → assistant response`: briefly state what the user asked, clarified, corrected, or decided; what the assistant actually did in response; what the project or conversation has now advanced to; and, when useful for continuity, how the assistant ultimately replied or delivered the result. Keep this as natural language rather than fixed fields.
 
 When no matching slot exists, create one with the current timestamp and `[reflection:pending]`.
 

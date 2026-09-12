@@ -1,0 +1,2 @@
+name: 「月」模式
+description: 主 Agent 只保留对话、判断与一次性委派能力；实际工具工作由隔离的 one-shot SubAgent Worker 执行。

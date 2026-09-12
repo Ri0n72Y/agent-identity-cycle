@@ -1,0 +1,136 @@
+# 「月」模式：角色主体保持最小工具面，实际工作优先交给 one-shot SubAgent。
+#
+# 设计目标：
+# - 顶层 Luna 尽量只聊天、判断和转述，减少工具调用对角色扮演的削弱；
+# - Shell / FS / Web / Skill / Todo / Jobs 等执行能力仍注册在 preset 中，供 spawn child 使用；
+# - 顶层 root agent 由 ./luna-tool-policy.mjs 收窄为 subagent + present；
+# - spawn child 跳过 root 限制，并由 dsh-tool-subagent 的 persona / toolFilter 变成纯执行 Worker；
+# - 第一版只使用 foreground one-shot，不提供 continuable control、fork、workflow 或 ralph。
+
+# ── identity ────────────────────────────────────────────────────────────────
+
+- id: persona
+  name: "./luna-persona.mjs?v=1"
+  config:
+    home: 'D:\Assistant\home'
+    sources:
+      - "identity/PERSONA.md"
+      - "identity/SOUL.md"
+    suffix: "Your working directory is {{cwd}}."
+    overrides: |-
+      ## 本部署的执行方式
+
+      你是与用户持续交互的主体。保持自然对话、判断和角色表达；不要为了展示能力而主动使用工具。
+
+      当任务需要读取或修改文件、运行命令、访问 Web、使用 Skill、分析仓库、生成或整理文件、维护记忆，或进行其他多步工具工作时，优先把完整任务一次性交给 `subagent`。委派内容必须自包含，写清背景、目标、约束和预期结果；不要把一个可以由一次 SubAgent 完成的工作拆成多次主 Agent 工具调用。
+
+      简单对话、已有上下文足以直接回答的问题，以及不需要外部执行的判断，不要调用 SubAgent。SubAgent 返回后，由你根据结果继续判断，并用你自己的口吻向用户回应；不要模仿 Worker 的执行口吻，也不要机械复述它的全过程。
+
+      本部署的顶层 Agent 不直接使用 Shell、文件、Web、Skill、Todo 等工作工具。需要主机当前时间或其他运行时事实时，同样交给 SubAgent 获取。
+    complete: false
+    includeRuntimeContext: true
+
+- id: agent-instructions
+  name: "@deepseek-ai/dsh-agent-instructions"
+  config:
+    maxBytes: 65536
+
+# 顶层 Luna 的工具可见性策略。只限制 root agent；origin=subagent 的 child 不受此限制。
+- id: luna-tool-policy
+  name: "./luna-tool-policy.mjs?v=1"
+  config:
+    allow:
+      - subagent
+      - present
+
+# ── worker execution tools ─────────────────────────────────────────────────
+# 这些工具保留在 preset 组合里，但会被 root Luna 的 scoped restriction 隐藏。
+
+- id: tool-bash
+  name: "@deepseek-ai/dsh-tool-bash"
+  disabled: !!js process.platform === 'win32'
+
+- id: tool-pwsh
+  name: "@deepseek-ai/dsh-tool-pwsh"
+  disabled: !!js process.platform !== 'win32'
+
+- id: tool-fs
+  name: "@deepseek-ai/dsh-tool-fs"
+
+- id: tool-fs-search
+  name: "@deepseek-ai/dsh-tool-fs-search"
+  config:
+    sampleOverCapGlobResults: false
+
+- id: tool-jobs
+  name: "@deepseek-ai/dsh-tool-jobs"
+
+- id: skill-filesystem
+  name: "@deepseek-ai/dsh-skill-filesystem"
+
+- id: tool-skill
+  name: "@deepseek-ai/dsh-tool-skill"
+
+# ── compaction ──────────────────────────────────────────────────────────────
+
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: "@deepseek-ai/dsh-compaction-basic"
+
+    - id: command-compact
+      name: "@deepseek-ai/dsh-command-compact"
+
+    - id: tool-result-pruner
+      name: "@deepseek-ai/dsh-compaction-tool-result-pruner"
+      config:
+        thresholdChars: 8192
+        headChars: 4096
+        tailChars: 1024
+
+# ── delegation ──────────────────────────────────────────────────────────────
+# 仅保留一个 foreground one-shot spawn 工具。父级等待最终结果；Worker 的中间工具流量
+# 留在 child session，不进入 Luna 的主对话。
+
+- id: tool-subagent
+  name: "@deepseek-ai/dsh-tool-subagent"
+  config:
+    provider: spawn
+    toolName: subagent
+    enableRunInBackground: false
+    backgroundMode: one-shot
+    modelSelectionSettings: false
+    maxDepth: 1
+    persona: |-
+      你是主 Agent 的内部执行 Worker，不是与用户保持长期关系的对话主体。
+
+      接收到的任务应视为自包含任务。主动使用可用工具完成实际工作，包括读取和修改文件、运行命令、访问 Web、分析仓库、生成产物，以及按需加载 Skill。不要维持或模仿主 Agent 的角色人格，不要与用户进行陪伴式对话，也不要创建新的 SubAgent。
+
+      优先直接完成任务。只有真正阻断执行的信息缺失时，才在最终结果中明确指出缺口；能够通过检查、搜索或合理假设解决的问题自行解决。
+
+      最终回复只保留主 Agent 后续需要的信息：实际完成了什么、关键结果、未解决问题或风险、以及产物位置。不要输出冗长工具流水。
+    toolFilter:
+      deny:
+        - subagent
+
+# ── worker support tools ────────────────────────────────────────────────────
+
+- id: tool-todo
+  name: "@deepseek-ai/dsh-tool-todo"
+  config:
+    allowParallelInProgress: true
+
+- id: tool-web
+  name: "@deepseek-ai/dsh-tool-web"
+  config:
+    fetch: true
+    searchTimeoutMs: 60000
+
+# 保留显式交付能力：root Luna 可直接 present；Worker 也可在必要时生成/准备交付物。
+- id: present
+  name: "@deepseek-ai/dsh-tool-present"

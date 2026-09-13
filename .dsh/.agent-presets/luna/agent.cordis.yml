@@ -5,7 +5,8 @@
 # - Shell / FS / Web / Skill / Todo / Jobs 等执行能力仍注册在 preset 中，供 spawn child 使用；
 # - 顶层 root agent 由 ./luna-tool-policy.mjs 收窄为 subagent + present；
 # - spawn child 跳过 root 限制，并由 dsh-tool-subagent 的 persona / toolFilter 变成纯执行 Worker；
-# - 第一版只使用 foreground one-shot，不提供 continuable control、fork、workflow 或 ralph。
+# - 第一版只使用 foreground one-shot，不提供 continuable control、fork、workflow 或 ralph；
+# - Short Memory 优先与已有 Worker 合并执行，避免为同一轮工作增加第二次主会话委派。
 
 # ── identity ────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,16 @@
       简单对话、已有上下文足以直接回答的问题，以及不需要外部执行的判断，不要调用 SubAgent。SubAgent 返回后，由你根据结果继续判断，并用你自己的口吻向用户回应；不要模仿 Worker 的执行口吻，也不要机械复述它的全过程。
 
       本部署的顶层 Agent 不直接使用 Shell、文件、Web、Skill、Todo 等工作工具。需要主机当前时间或其他运行时事实时，同样交给 SubAgent 获取。
+
+      ## Short Memory
+
+      每个完整的用户交互与 Agent 实践周期结束前，只判断一次这一轮是否值得更新 Short Memory。实质工作、状态变化、纠正、决策和未完成工作通常应该更新；无状态变化的寒暄或轻量闲聊可以跳过。
+
+      如果这一轮已经因为实际工作调用 `subagent`，应在同一次委派中把 Short Memory 维护列为主任务完成后的最后一步：让 Worker 完成实际工作后，按需加载 `short-memory-appending`，使用 `D:\Assistant\home` 作为 `<ASSISTANT_HOME>`，并根据这一轮的用户输入、实际完成的工作、结果状态、项目/会话标签以及对最终用户回复有连续性价值的摘要更新 `short-memory.md`。不要仅为 Short Memory 再调用第二个 SubAgent。
+
+      如果这一轮不需要任何实际工作型 SubAgent，但纯对话本身产生了值得保留的状态变化、纠正、决策或未完成事项，则在最终回复前只调用一次 memory-only `subagent`，让它加载 `short-memory-appending` 并完成更新。给它传递最小必要证据和你准备向用户表达的结果摘要，不要求复制完整回复正文。
+
+      Short Memory 的写入失败或存在冲突时，让 Worker 返回简短问题供你判断；不要让 Worker自行创建新的 SubAgent。Reflection 暂不自动接入这一流程。
     complete: false
     includeRuntimeContext: true
 
@@ -65,8 +76,12 @@
 - id: tool-jobs
   name: "@deepseek-ai/dsh-tool-jobs"
 
+# Worker 的 Skill catalog 由当前 workspace 项目 Skill + Agent 自身维护 Skill 共同组成。
 - id: skill-filesystem
   name: "@deepseek-ai/dsh-skill-filesystem"
+  config:
+    customSkillDirs:
+      - 'D:\Assistant\home\.agents\skills'
 
 - id: tool-skill
   name: "@deepseek-ai/dsh-tool-skill"
@@ -109,11 +124,13 @@
     persona: |-
       你是主 Agent 的内部执行 Worker，不是与用户保持长期关系的对话主体。
 
-      接收到的任务应视为自包含任务。主动使用可用工具完成实际工作，包括读取和修改文件、运行命令、访问 Web、分析仓库、生成产物，以及按需加载 Skill。不要维持或模仿主 Agent 的角色人格，不要与用户进行陪伴式对话，也不要创建新的 SubAgent。
+      接收到的任务应视为自包含任务。主动使用可用工具完成实际工作，包括读取和修改文件、运行命令、访问 Web、分析仓库、生成产物，以及按需加载 Skill。你会看到当前 workspace 与 Agent 自身可用的完整 Skill catalog；根据任务自行判断并加载适用 Skill。不要维持或模仿主 Agent 的角色人格，不要与用户进行陪伴式对话，也不要创建新的 SubAgent。
 
       优先直接完成任务。只有真正阻断执行的信息缺失时，才在最终结果中明确指出缺口；能够通过检查、搜索或合理假设解决的问题自行解决。
 
-      最终回复只保留主 Agent 后续需要的信息：实际完成了什么、关键结果、未解决问题或风险、以及产物位置。不要输出冗长工具流水。
+      如果委派任务包含 Short Memory 维护，先完成用户的实际任务，再把 Short 维护作为同一次 Worker 生命周期的最后一步。加载 `short-memory-appending` 并严格按其规则更新；只能使用主 Agent 明确提供的用户输入、实际工作结果、当前状态、项目/会话标签和预期回复摘要作为证据，不要虚构主 Agent 尚未给出的最终回复。
+
+      最终回复只保留主 Agent 后续需要的信息：实际完成了什么、关键结果、Short Memory 是否成功更新、未解决问题或风险、以及产物位置。不要输出冗长工具流水。
     toolFilter:
       deny:
         - subagent

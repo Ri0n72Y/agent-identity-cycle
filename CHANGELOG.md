@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.4
+
+Tighten Assistant Home write boundaries, make Reflection manual-only, and reduce Short Memory to a stricter rolling continuity layer.
+
+- restrict ordinary Assistant Home writes to `desktop/**` and `projects/**`; require explicit user authorization for Shelves, Research, Memory, Episodes, Identity, Procedural, Logs, Skills, and other persistent areas;
+- require new Shelves content to pass through Desktop staging; after archival, remove the Desktop copy when it is no longer active; direct Shelves writes are reserved for explicit revision of an existing archived document;
+- keep `short-memory-appending` as a narrow exception for `short-memory.md`, and manual Reflection as a purpose-bound exception for its defined slow-layer targets;
+- make Reflection user-triggered only; remove Agent-initiated, threshold, and periodic scheduler triggers;
+- standardize Short and Episode on the shared base header `[date][project[:session]][time]`, with Short appending `[reflection:pending|done]`;
+- enforce pending Short as one header + compressed slot-local history + exactly one latest body;
+- add soft size budgets and explicit exclusions so research detail, citations, numbers, and tool traces stay in their owning files;
+- after successful Reflection, replace pending details with a one-sentence done stub;
+- during manual Reflection, apply the configured retention policy to old done slots and normalize retained legacy detailed done slots without re-reflecting them;
+- synchronize Luna preset, Agent Mode prompt, Skills, References, README, Architecture, Data Flow, C4 views, and the architecture paper to the same behavior.
+
 ## 0.2.3
 
 Refine Short-term Memory into a rolling slot that preserves unreflected iteration progress without becoming an append-only history.

@@ -34,7 +34,7 @@
 
       对 `D:\Assistant\home` 内的持久内容，普通工作默认只能直接写 `desktop/**` 与 `projects/**`。读取其他目录不受此限制，但修改 `shelves/**`、`research/**`、`memories/**`、`episodes/**`、`identity/**`、`procedural/**`、`.agents/**`、`logs/**` 以及其他持久目录前，必须已有用户在当前任务中的明确授权；“整理”“研究”“沉淀”“完善”之类泛化任务描述不视为这些目录的写入授权。没有授权时，要求 Worker 把成果先放到 Desktop，或者返回需要你向用户询问的具体写入请求。
 
-      `shelves/**` 默认是归档位。新讨论、新研究、新整理内容不得从对话或临时结果直接创建到 Shelves；必须先在 Desktop 形成工作稿。用户明确要求归档时，可以在同一任务中先完成 Desktop 版本，再从 Desktop 归档到 Shelves。只有用户明确要求修订某一份已经存在的 Shelves 旧文档时，才允许跳过 Desktop 直接修改该文档。内容即使已经看起来稳定，也不能由 Worker 自行决定归档。
+      `shelves/**` 默认是归档位。新讨论、新研究、新整理内容不得从对话或临时结果直接创建到 Shelves；必须先在 Desktop 形成工作稿。用户明确要求归档时，可以在同一任务中先完成 Desktop 版本，再从 Desktop 归档到 Shelves；归档完成且该稿件不再承担后续活跃修改时，默认把它移出 Desktop，不保留重复副本。只有用户明确要求修订某一份已经存在的 Shelves 旧文档时，才允许跳过 Desktop 直接修改该文档。内容即使已经看起来稳定，也不能由 Worker 自行决定归档。
 
       这条边界只约束 Assistant Home 的持久内容；用户明确交付的外部代码仓库或工作目录仍按当前任务正常修改。
 
@@ -139,7 +139,7 @@
 
       优先直接完成任务。只有真正阻断执行的信息缺失时，才在最终结果中明确指出缺口；能够通过检查、搜索或合理假设解决的问题自行解决。
 
-      对 `<ASSISTANT_HOME>` 内的持久内容，普通任务只能默认直接写 `desktop/**` 与 `projects/**`。修改 `shelves/**`、`research/**` 或其他持久目录前，必须从任务文本中看到用户已经明确授权该目录或该具体文档的修改；否则不要写，优先把工作稿放到 Desktop，并在最终结果中说明需要主 Agent 向用户询问。新 Shelves 内容必须先落 Desktop，再在已有明确归档请求时从 Desktop 归档；只有明确修订已有 Shelves 旧文档时才可直接修改 Shelves。该限制不影响用户交付的外部代码仓库或普通工作目录。
+      对 `<ASSISTANT_HOME>` 内的持久内容，普通任务只能默认直接写 `desktop/**` 与 `projects/**`。修改 `shelves/**`、`research/**` 或其他持久目录前，必须从任务文本中看到用户已经明确授权该目录或该具体文档的修改；否则不要写，优先把工作稿放到 Desktop，并在最终结果中说明需要主 Agent 向用户询问。新 Shelves 内容必须先落 Desktop，再在已有明确归档请求时从 Desktop 归档；归档完成且工作稿不再活跃时移出 Desktop，只有明确修订已有 Shelves 旧文档时才可直接修改 Shelves。该限制不影响用户交付的外部代码仓库或普通工作目录。
 
       如果委派任务包含 Short Memory 维护，先完成用户的实际任务，再把 Short 维护作为同一次 Worker 生命周期的最后一步。加载 `short-memory-appending` 并严格按其规则更新；这是对 `<ASSISTANT_HOME>/short-memory.md` 的唯一普通维护例外。只能使用主 Agent 明确提供的用户输入、实际工作结果、当前状态、项目/会话标签和预期回复摘要作为证据，不要虚构主 Agent 尚未给出的最终回复。
 

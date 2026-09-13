@@ -13,7 +13,7 @@ Do not invoke Reflection automatically. A new pending Short slot, a large amount
 
 Run Reflection only when the user explicitly requests Reflection, consolidation of pending Short material, or an equivalent manual maintenance action. Do not create a periodic scheduler for Reflection and do not append Reflection as a second maintenance step after routine Short updates.
 
-When the Harness supports subagents, prefer running Reflection in a dedicated subagent so the parent Agent does not fill its active context with historical files and consolidation details. Give the subagent the configured absolute assistant-home path, the pending Short slots or time range the user asked to consider, and only the current context needed to interpret them. The subagent should load the target files needed by the relevant routes, make the authorized updates, collapse processed Short slots to done stubs, and return a concise summary of what changed and any ambiguity requiring parent judgment.
+When the Harness supports subagents, prefer running Reflection in a dedicated subagent so the parent Agent does not fill its active context with historical files and consolidation details. Give the subagent the configured absolute assistant-home path, the pending Short slots or time range the user asked to consider, and only the current context needed to interpret them. The subagent should load the target files needed by the relevant routes, make the authorized updates, collapse processed Short slots to done stubs, apply the configured done-slot retention cleanup, and return a concise summary of what changed and any ambiguity requiring parent judgment.
 
 ## Authorization boundary
 
@@ -28,7 +28,7 @@ An explicit user request to run Reflection counts as authorization for the stand
 <ASSISTANT_HOME>/projects/**
 ```
 
-This authorization is purpose-bound: only make changes justified by the pending Short evidence being reflected.
+This authorization is purpose-bound: only make changes justified by the Short evidence being reflected.
 
 A Reflection request does not by itself authorize modifications to `shelves/**`, `research/**`, `logs/**`, arbitrary `.agents/skills/**`, or other persistent areas. Read them when needed as evidence, but ask separately before modifying them. In particular, do not move Desktop work into Shelves merely because Reflection judges it stable, and do not edit a root-level Research corpus as part of consolidation. Shelves archival still requires an explicit archive request, with new material staged in Desktop first. Concrete Skill changes under `.agents/skills/` also require separate explicit user authorization; Reflection may record a procedural lesson or recommend a Skill change without applying it.
 
@@ -106,5 +106,15 @@ If no slower file needed an update, still collapse the slot:
 Do not retain the old pending logs or body “for safety”. Their durable information has either been routed to the appropriate long-term layer or deliberately judged unnecessary. Keeping them would make Short duplicate the archive and grow without bound.
 
 If Reflection fails before all required routes for a slot are complete, do not mark or collapse that slot as done. Leave it pending and report the failure.
+
+## Retention cleanup for completed slots
+
+Manual Reflection is also the maintenance point for already-completed Short slots. After pending consolidation succeeds, inspect existing `[reflection:done]` slots under the deployment's configured Short retention policy.
+
+- If a done slot is older than the configured retention horizon and is no longer active, remove the whole slot from `short-memory.md`.
+- If a legacy done slot is still within retention but contains old detailed logs or a full body from an earlier format, normalize it to the current one-sentence done stub without re-reflecting its content.
+- If no retention horizon is configured, do not invent one; keep retained done stubs and only normalize legacy detailed done slots.
+
+This cleanup is based on the done slot timestamp and the configured retention policy. It must not reopen already-reflected material as pending evidence.
 
 Keep canonical content file-first and readable. Natural-language files carry the long-lived meaning; indexes, knowledge graphs, retrieval systems, and runtime world-model assembly can be derived externally. If an internal Reflection route eventually becomes complex enough to require its own context, place that procedure under `workflows/` while keeping this `SKILL.md` as the stable manually invoked entry point.

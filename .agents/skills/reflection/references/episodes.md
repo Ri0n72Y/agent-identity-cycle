@@ -4,7 +4,13 @@
 
 Episode 保存已经发生、值得长期保留，并可能在未来被重新解释的具体实践经历。记录应保留讨论了什么、Agent 做了什么、发生了什么改变以及最终如何处理，使一段实践在脱离原始会话以后仍然能够被准确理解。
 
-Episode 使用与 Short 相同的基础索引格式，见 [short-memory-appending 的标准记忆格式](../../short-memory-appending/references/memory-format.md)，但不携带 Short 的 Reflection 状态标记。
+Episode 使用与 Short 相同的基础索引格式，见 [short-memory-appending 的标准记忆格式](../../short-memory-appending/references/memory-format.md)，但不携带 Short 的 Reflection 状态标记：
+
+```text
+[日期][项目[:会话]][时间]
+```
+
+项目/会话这一格按第一个 `:` 区分 project 与 session；session 内可以继续使用冒号表达稳定层级。时间统一使用 `HH:mm:ss`。
 
 ## Episode 的分类
 
@@ -24,7 +30,7 @@ Self.md 保存所有与 Agent 自身形成有关的事实。如果删除这段�
 例如：
 
 ```markdown
-[2026-01-15][project-alpha][20:20][review]
+[2026-01-15][project-alpha:review][20:20:35]
 
 在一次架构审查中，Agent 在尚未检查完已有文档时补充了一个现有材料未包含的结构。用户指出该结构缺少来源后，Agent 重新读取相关文件，确认此前补充没有依据，并删除了对应内容，恢复到已经确认的设计。
 ```
@@ -36,7 +42,7 @@ User.md 保存与用户个人相关、并能帮助未来理解用户是谁、如
 例如：
 
 ```markdown
-[2026-01-15][project-alpha][20:20]
+[2026-01-15][project-alpha][20:20:35]
 
 用户在本轮文档整理中明确要求优先保留自然语言和完整上下文，并要求只有在存在实际运行价值时才新增目录；Agent 随后删除了两个尚无用途的预留结构。
 ```
@@ -48,7 +54,7 @@ Facts.md 保存既不属于 Agent 自我形成，也不主要描述用户个人�
 例如：
 
 ```markdown
-[2026-01-15][project-alpha][20:20][tool-debug]
+[2026-01-15][project-alpha:tool-debug][20:20:35]
 
 某工具在缺少目标标识参数时返回参数校验错误；补充目标标识后再次调用成功，且没有出现原错误。
 ```

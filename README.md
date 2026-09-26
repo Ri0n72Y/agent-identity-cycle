@@ -35,7 +35,12 @@ docs/
 ├── data-flow.md
 ├── c4.md
 ├── paper.md
-└── skill-writing-principles.md
+├── skill-writing-principles.md
+└── identity/
+    ├── README.md
+    ├── runtime.md
+    ├── task-contract.md
+    └── reflection.md
 ```
 
 ## Design summary
@@ -65,6 +70,7 @@ Natural-language files remain canonical content. Knowledge graphs, vector stores
 ## Documentation
 
 - [Architecture](docs/architecture.md) — current normative architecture and write boundaries.
+- [Identity vNext](docs/identity/README.md) — current design baseline for Soul, Root/Worker separation, Task Contract, Reflection Ralph, and mPFC audit history.
 - [Data flow](docs/data-flow.md) — fast Short maintenance, manual Reflection, retention cleanup, and Desktop/Shelves flow.
 - [C4 views](docs/c4.md) — context, container, and component views for the current two-Skill lifecycle.
 - [Architecture paper](docs/paper.md) — research-oriented explanation synchronized to the current 0.2.4 behavior.

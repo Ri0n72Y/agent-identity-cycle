@@ -1,5 +1,7 @@
 # Persistent Agent Identity Cycle Architecture
 
+> Identity 子系统正在按新的 Ralph-based 方向收敛。当前已确认的 Identity vNext 结构、Root/Worker 边界、Task Contract 与 Reflection/mPFC 规则，以 [docs/identity/](identity/README.md) 为当前设计权威。本文其余内容仍描述 0.2.4 已实现的整体 Memory / Reflection 架构，尚未完成向该 Identity 设计的迁移。
+
 这套架构把长期数字助手理解为一个持续工作的文件型主体，并把“近期连续性落盘”和“较慢的长期整理”拆成两个不同频率、不同触发主体的能力。Working Context 负责即时工作；`short-memory-appending` 在一次完整用户交互与 Agent 实践结束后，由助手自行判断是否调用，并在需要时维护根目录 `short-memory.md` 中对应项目/会话的 rolling slot；`reflection` 只在用户明确手动触发时运行，将尚未反思的 Short 推进到 Project State、Episode、Long-term Memory、Facts、Identity 与 Procedural。
 
 Short 与 Episode 共用基础索引 `[日期][项目[:会话]][时间]`。Short 额外追加 `[reflection:pending|done]`。项目/会话这一格按第一个 `:` 区分 project 与 session，session 内可以继续使用冒号表达稳定层级。同一项目/会话只维护一个 rolling Short slot；同一项目的不同会话彼此相邻，但 `short-memory.md` 本身保持扁平自然排列。
